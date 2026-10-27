@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="pt-br">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login</title>
+    <style>
+      body {
+        min-height: 100vh;
+        margin: 0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-family: Arial;
+      }
+      td {
+        font-size: 14pt;
+      }
+      input[type="text"] {
+        font-size: 14pt;
+        color: red;
+      }
+      input[type="password"] {
+        font-size: 14pt;
+        color: red;
+      }
+      input[type="submit"] {
+        font-size: 14pt;
+        width: 100%;
+        color: rgb(102, 101, 101);
+      }
+
+      .tabela {
+        width: 400px;
+        color: rgb(102, 101, 101);
+
+        border: 1px solid;
+      }
+    </style>
+  </head>
+  <body>
+    <form action="login.jsp" method="post">
+      <table class="tabela" align="center">
+        <tr>
+          <td>USER</td>
+          <td align="right">
+            <input
+              placeholder="Digite seu nome de usuário"
+              type="text"
+              size="20"
+              name="user"
+            />
+          </td>
+        </tr>
+        <tr>
+          <td>PASSWORD</td>
+          <td align="right">
+            <input
+              placeholder="Digite sua senha"
+              type="password"
+              size="20"
+              name="pass"
+            />
+          </td>
+        </tr>
+        <tr>
+          <td colspan="2">
+            <input type="submit" value="ENTRAR NO SISTEMA COM SESSÃO" />
+          </td>
+        </tr>
+      </table>
+    </form>
+  </body>
+</html>
