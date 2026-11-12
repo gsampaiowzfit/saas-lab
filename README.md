@@ -45,9 +45,37 @@ O fluxo de autenticação segura e controle de sessão é fundamentado em três 
 | **Passo 1** | Conversão de `index.html` para `index.jsp` com anti-cache e verificação de sessão | 🟢 Concluído |
 | **Passo 2** | Construção do backend de autenticação (`login.jsp`) com JDBC e MD5 | 🟢 Concluído |
 | **Passo 3** | Criação da página restrita (`autorizo.jsp`) com barreira de sessão | 🟢 Concluído |
-| **Passo 4** | Preparação do banco de dados na VM (`enterprise` / `autenticacaoMais`) | 🟡 Pendente |
-| **Passo 5** | Deploy dos arquivos na pasta de aplicações web do Tomcat | ⚪ A Fazer |
+| **Passo 4** | Preparação do banco de dados na VM (`enterprise` / `autenticacaoMais`) | 🟢 Concluído |
+| **Passo 5** | Deploy dos arquivos na pasta de aplicações web do Tomcat | 🟡 Pendente |
 | **Passo 6** | Configuração do pool de conexões/threads e testes no Tomcat Manager | ⚪ A Fazer |
+
+---
+
+## 🗄️ Execução do Script SQL na VM (Passo 4)
+
+Para preparar a base de dados na Máquina Virtual via SSH:
+
+1. **Acessar a VM:**
+   ```bash
+   ssh seu_usuario@IP_DA_VM
+   ```
+
+2. **Executar o script SQL:**
+   ```bash
+   sudo mysql < conf/script.sql
+   # ou interativamente:
+   sudo mysql -u root -p < conf/script.sql
+   ```
+
+3. **Verificar a criação:**
+   ```bash
+   mysql -u saas -psaas enterprise -e "SELECT id, usuario, tokenvigente, ultimo_acesso FROM autenticacaoMais;"
+   ```
+
+### Usuários de Teste Pré-Configurados
+* **Usuário:** `admin` | **Senha:** `admin`
+* **Usuário:** `saas` | **Senha:** `saas`
+* **Usuário:** `medico` | **Senha:** `123456`
 
 ---
 
