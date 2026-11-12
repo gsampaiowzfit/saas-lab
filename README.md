@@ -46,8 +46,55 @@ O fluxo de autenticação segura e controle de sessão é fundamentado em três 
 | **Passo 2** | Construção do backend de autenticação (`login.jsp`) com JDBC e MD5 | 🟢 Concluído |
 | **Passo 3** | Criação da página restrita (`autorizo.jsp`) com barreira de sessão | 🟢 Concluído |
 | **Passo 4** | Preparação do banco de dados na VM (`enterprise` / `autenticacaoMais`) | 🟢 Concluído |
-| **Passo 5** | Deploy dos arquivos na pasta de aplicações web do Tomcat | 🟡 Pendente |
-| **Passo 6** | Configuração do pool de conexões/threads e testes no Tomcat Manager | ⚪ A Fazer |
+| **Passo 5** | Deploy dos arquivos na pasta de aplicações web do Tomcat | 🟢 Concluído |
+| **Passo 6** | Configuração do pool de conexões/threads e testes no Tomcat Manager | 🟡 Pendente |
+
+---
+
+## 🚀 Transferência de Arquivos e Deploy no Tomcat (Passo 5)
+
+Existem duas formas simples de transferir os arquivos do seu computador para a VM:
+
+### Opção A: Clonar diretamente via Git na VM (Recomendado)
+Na VM (via SSH):
+```bash
+# Clone ou navegue até o repositório
+git clone <URL_DO_SEU_REPOSITORIO> saas-lab
+cd saas-lab
+git checkout feat/deploy-tomcat-vm
+
+# Execute o script automatizado de deploy
+chmod +x deploy.sh
+./deploy.sh
+```
+
+### Opção B: Transferir via SCP pelo Windows (PowerShell)
+No seu terminal local (Windows):
+```powershell
+# Transferir os arquivos da aplicação para a pasta home do usuário na VM
+scp -r index.jsp login.jsp autorizo.jsp WEB-INF deploy.sh conf usuario@IP_DA_VM:~/saas-lab/
+```
+
+Em seguida, na VM (via SSH):
+```bash
+cd ~/saas-lab
+chmod +x deploy.sh
+./deploy.sh
+```
+
+### Localização Padrão no Tomcat:
+A aplicação é instalada em:
+```text
+/var/lib/tomcat9/webapps/saas-lab/
+  ├── index.jsp
+  ├── login.jsp
+  ├── autorizo.jsp
+  └── WEB-INF/
+        └── web.xml
+```
+
+> [!IMPORTANT]
+> **Driver JDBC do MySQL:** Para que o `login.jsp` consiga se conectar ao MySQL, o Tomcat precisa ter o arquivo `.jar` do conector JDBC em sua pasta `lib` (ex: `/var/lib/tomcat9/lib/` ou `/opt/tomcat/lib/`). O script `deploy.sh` verifica e instala automaticamente se necessário (`sudo apt install libmysql-java`).
 
 ---
 
