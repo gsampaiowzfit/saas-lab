@@ -44,8 +44,8 @@ O fluxo de autenticação segura e controle de sessão é fundamentado em três 
 | :--- | :--- | :---: |
 | **Passo 1** | Conversão de `index.html` para `index.jsp` com anti-cache e verificação de sessão | 🟢 Concluído |
 | **Passo 2** | Construção do backend de autenticação (`login.jsp`) com JDBC e MD5 | 🟢 Concluído |
-| **Passo 3** | Criação da página restrita (`autorizo.jsp`) com barreira de sessão | 🟡 Pendente |
-| **Passo 4** | Preparação do banco de dados na VM (`enterprise` / `autenticacaoMais`) | ⚪ A Fazer |
+| **Passo 3** | Criação da página restrita (`autorizo.jsp`) com barreira de sessão | 🟢 Concluído |
+| **Passo 4** | Preparação do banco de dados na VM (`enterprise` / `autenticacaoMais`) | 🟡 Pendente |
 | **Passo 5** | Deploy dos arquivos na pasta de aplicações web do Tomcat | ⚪ A Fazer |
 | **Passo 6** | Configuração do pool de conexões/threads e testes no Tomcat Manager | ⚪ A Fazer |
 
