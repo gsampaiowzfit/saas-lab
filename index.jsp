@@ -1,3 +1,16 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%
+    // Desabilitar o cache do navegador
+    response.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    response.setHeader("Pragma", "no-cache");
+    response.setDateHeader("Expires", 0);
+
+    // Se já houver sessão ativa, redireciona diretamente para a área restrita
+    if (session.getAttribute("token") != null && session.getId().equals(session.getAttribute("token"))) {
+        response.sendRedirect("autorizo.jsp");
+        return;
+    }
+%>
 <!doctype html>
 <html lang="pt-br">
   <head>
