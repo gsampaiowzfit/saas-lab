@@ -47,7 +47,7 @@ O fluxo de autenticação segura e controle de sessão é fundamentado em três 
 | **Passo 3** | Criação da página restrita (`autorizo.jsp`) com barreira de sessão | 🟢 Concluído |
 | **Passo 4** | Preparação do banco de dados na VM (`enterprise` / `autenticacaoMais`) | 🟢 Concluído |
 | **Passo 5** | Deploy dos arquivos na pasta de aplicações web do Tomcat | 🟢 Concluído |
-| **Passo 6** | Configuração do pool de conexões/threads e testes no Tomcat Manager | 🟡 Pendente |
+| **Passo 6** | Configuração do pool de conexões/threads e testes no Tomcat Manager | 🟢 Concluído |
 
 ---
 
@@ -123,6 +123,34 @@ Para preparar a base de dados na Máquina Virtual via SSH:
 * **Usuário:** `admin` | **Senha:** `admin`
 * **Usuário:** `saas` | **Senha:** `saas`
 * **Usuário:** `medico` | **Senha:** `123456`
+
+---
+
+---
+
+## ⚙️ Configuração do Tomcat e Testes (Passo 6)
+
+### 1. Pool de Threads (`<Executor>`) no `server.xml`
+O arquivo modelo [`conf/server.xml`](./conf/server.xml) contém a configuração recomendada de `<Executor>` (`tomcatThreadPool` com `maxThreads="150"` e `minSpareThreads="10"`) vinculada ao `<Connector port="8080" />` para melhorar a concorrência da aplicação no Tomcat.
+
+Para aplicar na VM (Tomcat 10):
+```bash
+sudo cp /etc/tomcat10/server.xml /etc/tomcat10/server.xml.bak
+sudo cp conf/server.xml /etc/tomcat10/server.xml
+sudo systemctl restart tomcat10
+```
+
+### 2. Monitoramento no Tomcat Web Application Manager (`/manager/html`)
+1. Acesse `http://<IP_DA_VM>:8080/manager/html`.
+2. Verifique na linha da aplicação (`/myapp` ou `/saas-lab`) a coluna **Sessions**:
+   - Ao efetuar login, o contador de sessões ativas aumenta.
+   - Ao clicar em **Encerrar Sessão** (`autorizo.jsp?logout=true`), a sessão é invalidada e o contador diminui.
+
+### 3. Checklist Final de Validação
+- [ ] Acesso direto a `autorizo.jsp` sem login redireciona para `index.jsp`.
+- [ ] Login com `admin` / `admin` autentica via JDBC + MD5 e exibe o `Session ID`.
+- [ ] Coluna `tokenvigente` e `ultimo_acesso` são atualizadas na tabela `autenticacaoMais`.
+- [ ] Logout limpa a sessão e o botão Voltar do navegador não exibe a área restrita (anti-cache).
 
 ---
 
