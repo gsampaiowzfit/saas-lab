@@ -32,12 +32,15 @@
     String dbUser = "saas";
     String dbPass = "saas";
 
-    String mensagemSucesso = null;
-    String mensagemErro = null;
+    String mensagemSucesso = (String) session.getAttribute("flashSucesso");
+    String mensagemErro = (String) session.getAttribute("flashErro");
+    session.removeAttribute("flashSucesso");
+    session.removeAttribute("flashErro");
 
     List<Map<String, String>> listaMedicos = new ArrayList<>();
     List<Map<String, String>> listaConsultas = new ArrayList<>();
 
+    boolean redirecionar = false;
     Connection conn = null;
     try {
         Class.forName("com.mysql.cj.jdbc.Driver");
@@ -50,13 +53,14 @@
                 psDel.setInt(1, Integer.parseInt(cancelarId));
                 int removidos = psDel.executeUpdate();
                 if (removidos > 0) {
-                    mensagemSucesso = "Consulta #" + cancelarId + " cancelada com sucesso.";
+                    session.setAttribute("flashSucesso", "Consulta #" + cancelarId + " cancelada com sucesso.");
                 }
             }
+            redirecionar = true;
         }
 
         // 2. Agendamento de nova consulta (via POST)
-        if ("POST".equalsIgnoreCase(request.getMethod()) && "agendar".equals(request.getParameter("acao"))) {
+        if (!redirecionar && "POST".equalsIgnoreCase(request.getMethod()) && "agendar".equals(request.getParameter("acao"))) {
             String medicoIdStr = request.getParameter("medico_id");
             String pacienteNome = request.getParameter("paciente_nome");
             String pacienteCpf = request.getParameter("paciente_cpf");
@@ -65,37 +69,9 @@
 
             if (medicoIdStr == null || pacienteNome == null || pacienteCpf == null || pacienteNasc == null || dataConsulta == null ||
                 medicoIdStr.trim().isEmpty() || pacienteNome.trim().isEmpty() || pacienteCpf.trim().isEmpty() || pacienteNasc.trim().isEmpty() || dataConsulta.trim().isEmpty()) {
-                mensagemErro = "Preencha todos os campos para agendar a consulta.";
+                session.setAttribute("flashErro", "Preencha todos os campos para agendar a consulta.");
             } else {
                 int medicoId = Integer.parseInt(medicoIdStr);
-                int pacienteId = -1;
-
-                // Verifica se o paciente já existe pelo CPF
-                try (PreparedStatement psBuscaPac = conn.prepareStatement("SELECT id FROM pacientes WHERE cpf = ? LIMIT 1")) {
-                    psBuscaPac.setString(1, pacienteCpf.trim());
-                    try (ResultSet rsPac = psBuscaPac.executeQuery()) {
-                        if (rsPac.next()) {
-                            pacienteId = rsPac.getInt("id");
-                        }
-                    }
-                }
-
-                // Se não existir, cadastra o paciente automaticamente
-                if (pacienteId == -1) {
-                    try (PreparedStatement psInsPac = conn.prepareStatement(
-                            "INSERT INTO pacientes (nome, cpf, data_nascimento) VALUES (?, ?, ?)",
-                            Statement.RETURN_GENERATED_KEYS)) {
-                        psInsPac.setString(1, pacienteNome.trim());
-                        psInsPac.setString(2, pacienteCpf.trim());
-                        psInsPac.setString(3, pacienteNasc.trim());
-                        psInsPac.executeUpdate();
-                        try (ResultSet rsKeys = psInsPac.getGeneratedKeys()) {
-                            if (rsKeys.next()) {
-                                pacienteId = rsKeys.getInt(1);
-                            }
-                        }
-                    }
-                }
 
                 // Converte formato HTML datetime-local (YYYY-MM-DDTHH:MM) para MySQL (YYYY-MM-DD HH:MM:SS)
                 String dataFormatada = dataConsulta.replace("T", " ");
@@ -103,54 +79,113 @@
                     dataFormatada += ":00";
                 }
 
-                try (PreparedStatement psInsCons = conn.prepareStatement(
-                        "INSERT INTO consultas (medico_id, paciente_id, data_consulta) VALUES (?, ?, ?)")) {
-                    psInsCons.setInt(1, medicoId);
-                    psInsCons.setInt(2, pacienteId);
-                    psInsCons.setString(3, dataFormatada);
-                    psInsCons.executeUpdate();
-                    mensagemSucesso = "Consulta agendada com sucesso para " + pacienteNome.trim() + "!";
+                // Verifica conflito de horário para o mesmo médico
+                boolean conflitoHorario = false;
+                try (PreparedStatement psConflito = conn.prepareStatement(
+                        "SELECT id FROM consultas WHERE medico_id = ? AND data_consulta = ? LIMIT 1")) {
+                    psConflito.setInt(1, medicoId);
+                    psConflito.setString(2, dataFormatada);
+                    try (ResultSet rsConflito = psConflito.executeQuery()) {
+                        if (rsConflito.next()) {
+                            conflitoHorario = true;
+                        }
+                    }
+                }
+
+                if (conflitoHorario) {
+                    session.setAttribute("flashErro", "Este médico já possui uma consulta agendada para esta data e horário.");
+                } else {
+                    int pacienteId = -1;
+
+                    // Verifica se o paciente já existe pelo CPF
+                    try (PreparedStatement psBuscaPac = conn.prepareStatement("SELECT id FROM pacientes WHERE cpf = ? LIMIT 1")) {
+                        psBuscaPac.setString(1, pacienteCpf.trim());
+                        try (ResultSet rsPac = psBuscaPac.executeQuery()) {
+                            if (rsPac.next()) {
+                                pacienteId = rsPac.getInt("id");
+                            }
+                        }
+                    }
+
+                    // Se não existir, cadastra o paciente automaticamente
+                    if (pacienteId == -1) {
+                        try (PreparedStatement psInsPac = conn.prepareStatement(
+                                "INSERT INTO pacientes (nome, cpf, data_nascimento) VALUES (?, ?, ?)",
+                                Statement.RETURN_GENERATED_KEYS)) {
+                            psInsPac.setString(1, pacienteNome.trim());
+                            psInsPac.setString(2, pacienteCpf.trim());
+                            psInsPac.setString(3, pacienteNasc.trim());
+                            psInsPac.executeUpdate();
+                            try (ResultSet rsKeys = psInsPac.getGeneratedKeys()) {
+                                if (rsKeys.next()) {
+                                    pacienteId = rsKeys.getInt(1);
+                                }
+                            }
+                        }
+                    }
+
+                    try (PreparedStatement psInsCons = conn.prepareStatement(
+                            "INSERT INTO consultas (medico_id, paciente_id, data_consulta) VALUES (?, ?, ?)")) {
+                        psInsCons.setInt(1, medicoId);
+                        psInsCons.setInt(2, pacienteId);
+                        psInsCons.setString(3, dataFormatada);
+                        psInsCons.executeUpdate();
+                        session.setAttribute("flashSucesso", "Consulta agendada com sucesso para " + pacienteNome.trim() + "!");
+                    }
+                }
+            }
+            redirecionar = true;
+        }
+
+        if (!redirecionar) {
+            // 3. Carrega lista de médicos para o select
+            try (PreparedStatement psMed = conn.prepareStatement("SELECT id, nome, especialidade FROM medicos ORDER BY nome");
+                 ResultSet rsMed = psMed.executeQuery()) {
+                while (rsMed.next()) {
+                    Map<String, String> med = new HashMap<>();
+                    med.put("id", rsMed.getString("id"));
+                    med.put("nome", rsMed.getString("nome"));
+                    med.put("especialidade", rsMed.getString("especialidade"));
+                    listaMedicos.add(med);
+                }
+            }
+
+            // 4. Carrega consultas agendadas com JOIN
+            String sqlConsultas =
+                "SELECT c.id, m.nome AS medico, m.especialidade, p.nome AS paciente, p.cpf, " +
+                "DATE_FORMAT(c.data_consulta, '%d/%m/%Y %H:%i') AS data_formatada " +
+                "FROM consultas c " +
+                "JOIN medicos m ON c.medico_id = m.id " +
+                "JOIN pacientes p ON c.paciente_id = p.id " +
+                "ORDER BY c.data_consulta ASC";
+            try (PreparedStatement psCons = conn.prepareStatement(sqlConsultas);
+                 ResultSet rsCons = psCons.executeQuery()) {
+                while (rsCons.next()) {
+                    Map<String, String> cons = new HashMap<>();
+                    cons.put("id", rsCons.getString("id"));
+                    cons.put("medico", rsCons.getString("medico"));
+                    cons.put("especialidade", rsCons.getString("especialidade"));
+                    cons.put("paciente", rsCons.getString("paciente"));
+                    cons.put("cpf", rsCons.getString("cpf"));
+                    cons.put("data_formatada", rsCons.getString("data_formatada"));
+                    listaConsultas.add(cons);
                 }
             }
         }
-
-        // 3. Carrega lista de médicos para o select
-        try (PreparedStatement psMed = conn.prepareStatement("SELECT id, nome, especialidade FROM medicos ORDER BY nome");
-             ResultSet rsMed = psMed.executeQuery()) {
-            while (rsMed.next()) {
-                Map<String, String> med = new HashMap<>();
-                med.put("id", rsMed.getString("id"));
-                med.put("nome", rsMed.getString("nome"));
-                med.put("especialidade", rsMed.getString("especialidade"));
-                listaMedicos.add(med);
-            }
-        }
-
-        // 4. Carrega consultas agendadas com JOIN
-        String sqlConsultas =
-            "SELECT c.id, m.nome AS medico, m.especialidade, p.nome AS paciente, p.cpf, " +
-            "DATE_FORMAT(c.data_consulta, '%d/%m/%Y %H:%i') AS data_formatada " +
-            "FROM consultas c " +
-            "JOIN medicos m ON c.medico_id = m.id " +
-            "JOIN pacientes p ON c.paciente_id = p.id " +
-            "ORDER BY c.data_consulta ASC";
-        try (PreparedStatement psCons = conn.prepareStatement(sqlConsultas);
-             ResultSet rsCons = psCons.executeQuery()) {
-            while (rsCons.next()) {
-                Map<String, String> cons = new HashMap<>();
-                cons.put("id", rsCons.getString("id"));
-                cons.put("medico", rsCons.getString("medico"));
-                cons.put("especialidade", rsCons.getString("especialidade"));
-                cons.put("paciente", rsCons.getString("paciente"));
-                cons.put("cpf", rsCons.getString("cpf"));
-                cons.put("data_formatada", rsCons.getString("data_formatada"));
-                listaConsultas.add(cons);
-            }
-        }
     } catch (Exception e) {
-        mensagemErro = "Erro ao acessar o banco de dados: " + e.getMessage();
+        if ("POST".equalsIgnoreCase(request.getMethod()) || request.getParameter("cancelar") != null) {
+            session.setAttribute("flashErro", "Erro ao acessar o banco de dados: " + e.getMessage());
+            redirecionar = true;
+        } else {
+            mensagemErro = "Erro ao acessar o banco de dados: " + e.getMessage();
+        }
     } finally {
         if (conn != null) try { conn.close(); } catch (Exception ignored) {}
+    }
+
+    if (redirecionar) {
+        response.sendRedirect("autorizo.jsp");
+        return;
     }
 %>
 <!doctype html>
