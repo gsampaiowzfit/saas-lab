@@ -71,66 +71,72 @@
                 medicoIdStr.trim().isEmpty() || pacienteNome.trim().isEmpty() || pacienteCpf.trim().isEmpty() || pacienteNasc.trim().isEmpty() || dataConsulta.trim().isEmpty()) {
                 session.setAttribute("flashErro", "Preencha todos os campos para agendar a consulta.");
             } else {
-                int medicoId = Integer.parseInt(medicoIdStr);
-
-                // Converte formato HTML datetime-local (YYYY-MM-DDTHH:MM) para MySQL (YYYY-MM-DD HH:MM:SS)
-                String dataFormatada = dataConsulta.replace("T", " ");
-                if (dataFormatada.length() == 16) {
-                    dataFormatada += ":00";
-                }
-
-                // Verifica conflito de horário para o mesmo médico
-                boolean conflitoHorario = false;
-                try (PreparedStatement psConflito = conn.prepareStatement(
-                        "SELECT id FROM consultas WHERE medico_id = ? AND data_consulta = ? LIMIT 1")) {
-                    psConflito.setInt(1, medicoId);
-                    psConflito.setString(2, dataFormatada);
-                    try (ResultSet rsConflito = psConflito.executeQuery()) {
-                        if (rsConflito.next()) {
-                            conflitoHorario = true;
-                        }
-                    }
-                }
-
-                if (conflitoHorario) {
-                    session.setAttribute("flashErro", "Este médico já possui uma consulta agendada para esta data e horário.");
+                String cpfDigitos = pacienteCpf.replaceAll("\\D", "");
+                if (cpfDigitos.length() != 11) {
+                    session.setAttribute("flashErro", "Informe um CPF válido com 11 dígitos.");
                 } else {
-                    int pacienteId = -1;
+                    String cpfFormatado = cpfDigitos.replaceFirst("(\\d{3})(\\d{3})(\\d{3})(\\d{2})", "$1.$2.$3-$4");
+                    int medicoId = Integer.parseInt(medicoIdStr);
 
-                    // Verifica se o paciente já existe pelo CPF
-                    try (PreparedStatement psBuscaPac = conn.prepareStatement("SELECT id FROM pacientes WHERE cpf = ? LIMIT 1")) {
-                        psBuscaPac.setString(1, pacienteCpf.trim());
-                        try (ResultSet rsPac = psBuscaPac.executeQuery()) {
-                            if (rsPac.next()) {
-                                pacienteId = rsPac.getInt("id");
+                    // Converte formato HTML datetime-local (YYYY-MM-DDTHH:MM) para MySQL (YYYY-MM-DD HH:MM:SS)
+                    String dataFormatada = dataConsulta.replace("T", " ");
+                    if (dataFormatada.length() == 16) {
+                        dataFormatada += ":00";
+                    }
+
+                    // Verifica conflito de horário para o mesmo médico
+                    boolean conflitoHorario = false;
+                    try (PreparedStatement psConflito = conn.prepareStatement(
+                            "SELECT id FROM consultas WHERE medico_id = ? AND data_consulta = ? LIMIT 1")) {
+                        psConflito.setInt(1, medicoId);
+                        psConflito.setString(2, dataFormatada);
+                        try (ResultSet rsConflito = psConflito.executeQuery()) {
+                            if (rsConflito.next()) {
+                                conflitoHorario = true;
                             }
                         }
                     }
 
-                    // Se não existir, cadastra o paciente automaticamente
-                    if (pacienteId == -1) {
-                        try (PreparedStatement psInsPac = conn.prepareStatement(
-                                "INSERT INTO pacientes (nome, cpf, data_nascimento) VALUES (?, ?, ?)",
-                                Statement.RETURN_GENERATED_KEYS)) {
-                            psInsPac.setString(1, pacienteNome.trim());
-                            psInsPac.setString(2, pacienteCpf.trim());
-                            psInsPac.setString(3, pacienteNasc.trim());
-                            psInsPac.executeUpdate();
-                            try (ResultSet rsKeys = psInsPac.getGeneratedKeys()) {
-                                if (rsKeys.next()) {
-                                    pacienteId = rsKeys.getInt(1);
+                    if (conflitoHorario) {
+                        session.setAttribute("flashErro", "Este médico já possui uma consulta agendada para esta data e horário.");
+                    } else {
+                        int pacienteId = -1;
+
+                        // Verifica se o paciente já existe pelo CPF
+                        try (PreparedStatement psBuscaPac = conn.prepareStatement("SELECT id FROM pacientes WHERE cpf = ? LIMIT 1")) {
+                            psBuscaPac.setString(1, cpfFormatado);
+                            try (ResultSet rsPac = psBuscaPac.executeQuery()) {
+                                if (rsPac.next()) {
+                                    pacienteId = rsPac.getInt("id");
                                 }
                             }
                         }
-                    }
 
-                    try (PreparedStatement psInsCons = conn.prepareStatement(
-                            "INSERT INTO consultas (medico_id, paciente_id, data_consulta) VALUES (?, ?, ?)")) {
-                        psInsCons.setInt(1, medicoId);
-                        psInsCons.setInt(2, pacienteId);
-                        psInsCons.setString(3, dataFormatada);
-                        psInsCons.executeUpdate();
-                        session.setAttribute("flashSucesso", "Consulta agendada com sucesso para " + pacienteNome.trim() + "!");
+                        // Se não existir, cadastra o paciente automaticamente
+                        if (pacienteId == -1) {
+                            try (PreparedStatement psInsPac = conn.prepareStatement(
+                                    "INSERT INTO pacientes (nome, cpf, data_nascimento) VALUES (?, ?, ?)",
+                                    Statement.RETURN_GENERATED_KEYS)) {
+                                psInsPac.setString(1, pacienteNome.trim());
+                                psInsPac.setString(2, cpfFormatado);
+                                psInsPac.setString(3, pacienteNasc.trim());
+                                psInsPac.executeUpdate();
+                                try (ResultSet rsKeys = psInsPac.getGeneratedKeys()) {
+                                    if (rsKeys.next()) {
+                                        pacienteId = rsKeys.getInt(1);
+                                    }
+                                }
+                            }
+                        }
+
+                        try (PreparedStatement psInsCons = conn.prepareStatement(
+                                "INSERT INTO consultas (medico_id, paciente_id, data_consulta) VALUES (?, ?, ?)")) {
+                            psInsCons.setInt(1, medicoId);
+                            psInsCons.setInt(2, pacienteId);
+                            psInsCons.setString(3, dataFormatada);
+                            psInsCons.executeUpdate();
+                            session.setAttribute("flashSucesso", "Consulta agendada com sucesso para " + pacienteNome.trim() + "!");
+                        }
                     }
                 }
             }
@@ -401,7 +407,7 @@
 
         <div class="form-group">
           <label for="paciente_cpf">CPF do Paciente</label>
-          <input id="paciente_cpf" type="text" name="paciente_cpf" placeholder="000.000.000-00" required />
+          <input id="paciente_cpf" type="text" name="paciente_cpf" placeholder="000.000.000-00" maxlength="14" inputmode="numeric" pattern="\d{3}\.\d{3}\.\d{3}-\d{2}" title="Digite um CPF no formato 000.000.000-00" required />
         </div>
 
         <div class="form-group">
@@ -451,5 +457,23 @@
         </table>
       <% } %>
     </main>
+    <script>
+      (function () {
+        var cpfInput = document.getElementById("paciente_cpf");
+        if (!cpfInput) return;
+
+        function aplicarMascaraCpf(valor) {
+          var digitos = valor.replace(/\D/g, "").slice(0, 11);
+          digitos = digitos.replace(/(\d{3})(\d)/, "$1.$2");
+          digitos = digitos.replace(/(\d{3})(\d)/, "$1.$2");
+          digitos = digitos.replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+          return digitos;
+        }
+
+        cpfInput.addEventListener("input", function (e) {
+          e.target.value = aplicarMascaraCpf(e.target.value);
+        });
+      })();
+    </script>
   </body>
 </html>
